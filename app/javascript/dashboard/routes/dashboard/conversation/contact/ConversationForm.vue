@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 // constants & helpers
 import { ALLOWED_FILE_TYPES } from 'shared/constants/messages';
+import { MESSAGE_MAX_LENGTH } from 'shared/helpers/MessageTypeHelper';
 import { ExceptionWithMessage } from 'shared/helpers/CustomErrors';
 import { getInboxSource, INBOX_TYPES } from 'dashboard/helper/inbox';
 
@@ -199,6 +200,45 @@ export default {
     allowedFileTypes() {
       return ALLOWED_FILE_TYPES;
     },
+    isATwilioInbox() {
+      return (
+        this.selectedInbox &&
+        this.selectedInbox.inbox.channel_type === INBOX_TYPES.TWILIO
+      );
+    },
+    getRemainingLimitMessage() {
+      if (!this.isATwilioInbox) {
+        return null;
+      }
+      const messageLimit = MESSAGE_MAX_LENGTH.TWILIO_SMS;
+      const messageLength = this.message?.replace(/\n/g, '--').length;
+      let message;
+      if (messageLength > messageLimit - 50 && messageLength <= messageLimit) {
+        message = `${messageLimit - messageLength} characters remaining`;
+      } else {
+        message = null;
+      }
+      return message;
+    },
+    getLimitBreachedMessage() {
+      if (!this.isATwilioInbox) {
+        return null;
+      }
+      const messageLimit = MESSAGE_MAX_LENGTH.TWILIO_SMS;;
+      const messageLength = this.message?.replace(/\n/g, '--').length;
+      let message;
+      if (messageLength > messageLimit) {
+        message = `${messageLength - messageLimit} characters over`;
+      } else {
+        message = null;
+      }
+      return message;
+    },
+    isTwilioMessageLimitReached() {
+      const messageLimit = MESSAGE_MAX_LENGTH.TWILIO_SMS;;
+      const messageLength = this.message?.replace(/\n/g, '--').length;
+      return this.isATwilioInbox && messageLength > messageLimit;
+    }
   },
   watch: {
     message(value) {
@@ -503,6 +543,12 @@ export default {
             <span v-if="v$.message.$error" class="message">
               {{ $t('NEW_CONVERSATION.FORM.MESSAGE.ERROR') }}
             </span>
+            <span v-else-if="getRemainingLimitMessage" class="text-slate-600">
+              {{ getRemainingLimitMessage }}
+            </span>
+            <span v-else-if="getLimitBreachedMessage" class="text-red-600">
+              {{ getLimitBreachedMessage }}
+            </span>
           </label>
           <div v-if="isEmailOrWebWidgetInbox" class="flex flex-col">
             <FileUpload
@@ -557,7 +603,7 @@ export default {
       <button class="button clear" @click.prevent="onCancel">
         {{ $t('NEW_CONVERSATION.FORM.CANCEL') }}
       </button>
-      <woot-button type="submit" :is-loading="conversationsUiFlags.isCreating">
+      <woot-button type="submit" :is-loading="conversationsUiFlags.isCreating" :disabled="isTwilioMessageLimitReached">
         {{ $t('NEW_CONVERSATION.FORM.SUBMIT') }}
       </woot-button>
     </div>
